@@ -1,7 +1,6 @@
 const qrcode = require("qrcode-terminal");
 const { Client } = require("whatsapp-web.js");
 const fs = require("fs");
-const csv = require("csv-parser");
 const { exit } = require("process");
 
 const prompt = require("prompt-sync")({ sigint: true });
@@ -11,66 +10,75 @@ let contacts = [];
 let failed = [];
 let notwauser = [];
 
-fs.createReadStream("contact.csv")
-  .pipe(csv())
-  .on("data", (data) => contacts.push(data["Phone_Number"]))
-  .on("end", () => {});
-
-const client = new Client();
-
-client.on("qr", (qr) => {
-  qrcode.generate(qr, { small: true });
+fs.readFile("contact.txt", "utf8", (err, data) => {
+  if (err) {
+    console.error("Error reading the file:", err);
+    exit(1);
+  }
+  contacts = data.trim().split("\n");
+  createClient();
 });
 
-client.on("ready", async () => {
-  console.log("Client is ready!");
-  createGroup();
-});
+function createClient() {
+  const client = new Client();
 
-async function createGroup() {
+  client.on("qr", (qr) => {
+    qrcode.generate(qr, { small: true });
+  });
+
+  client.on("ready", async () => {
+    console.log("Client is ready!");
+    await createGroup(client);
+  });
+
+  client.initialize();
+}
+
+async function createGroup(client) {
   contacts = contacts.filter((each) => each != null);
   for (i = 0; i < contacts.length; i++) {
-    if (contacts[i].length === 10) {
-      contacts[i] = `91${contacts[i]}@c.us`;
-      if (!(await client.isRegisteredUser(contacts[i])))
+    const phoneNumber = contacts[i].trim();
+    if (phoneNumber.length === 10) {
+      contacts[i] = `91${phoneNumber}@c.us`;
+      if (!(await client.isRegisteredUser(contacts[i]))) {
         notwauser.push(contacts[i]);
+      }
     } else {
-      contacts[i] = `${contacts[i]}@c.us`;
-      if (!(await client.isRegisteredUser(contacts[i])))
+      contacts[i] = `${phoneNumber}@c.us`;
+      if (!(await client.isRegisteredUser(contacts[i]))) {
         notwauser.push(contacts[i]);
+      }
     }
   }
   console.log(`\nThese Numbers are not Registered in Whatsapp\n${notwauser}\n`);
 
-  contacts = contacts.filter((each) => notwauser.indexOf(each) == -1);
-  let res = await client.createGroup(`${name.trim()}`, contacts);
+  contacts = contacts.filter((each) => notwauser.indexOf(each) === -1);
+  const res = await client.createGroup(`${name.trim()}`, contacts);
   failed = Object.keys(res.missingParticipants);
   group_id = res.gid;
   await timer(400);
+  await AddFailed(client);
 }
 
-async function AddFailed(invitationlink) {
-  console.log(`\n\nWhatsapp invitations Group sent to \n${failed}\n\n`);
+async function AddFailed(client) {
+  console.log(`\n\nUndangan Grup WhatsApp telah dikirim ke \n${failed}\n\n`);
   for (i = 0; i < failed.length; i++) {
     try {
+      // Jeda acak antara 5 hingga 10 detik (5000 hingga 10000 ms)
+      const delay = Math.floor(Math.random() * (10000 - 5000 + 1) + 5000);
+      await timer(delay);
       await client.sendMessage(
         failed[i],
-        `https://chat.whatsapp.com/${invitationlink}`
+        `https://chat.whatsapp.com/${invitationlink.link}`
       );
+      console.log(`\nTautan Undangan Terkirim ke ${failed[i]}`);
     } catch {
-      console.log(`\nInvitation Link Not sent to ${failed[i]}`);
+      console.log(`\nTautan Undangan Tidak Dikirim ke ${failed[i]}`);
     }
   }
   await timer(2000);
   exit(0);
 }
 
-client.on("message", async (msg) => {
-  const group = await msg.getChat();
-  invitationlink = await group.getInviteCode();
-  AddFailed(invitationlink);
-});
 
 const timer = (ms) => new Promise((res) => setTimeout(res, ms));
-
-client.initialize();
