@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node app.js"
   },
-  "author": "ALIAS GEORGE",
-  "license": "ISC",
+  "author": "nol404",
+  "license": "MIT",
   "dependencies": {
     "puppeteer": "^20.9.0",
     "csv-parser": "^3.0.0",
